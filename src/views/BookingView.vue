@@ -142,7 +142,6 @@ const setCurrentWeek = (date) => {
 };
 
 const loadWeekSlots = async () => {
-  // Очищаем текущие бронирования
   for (const key in bookings) {
     delete bookings[key];
   }
@@ -156,16 +155,13 @@ const loadWeekSlots = async () => {
             const bookingResponse = await axios.get(`/api/bookings/${slot.id}`);
             bookings[slot.id] = bookingResponse.data;
           } catch (error) {
-            console.error(
-              `Ошибка получения бронирования для слота ${slot.id}:`,
-              error
-            );
+            console.error(`Error loading booking for ${slot.id}:`, error);
           }
         }
       }
       timeSlots[date] = slots;
     } catch (error) {
-      console.error(`Ошибка получения слотов для даты ${date}:`, error);
+      console.error(`Error loading time slots for ${date}:`, error);
     }
   }
 };
@@ -177,7 +173,7 @@ const generateSlots = async (date) => {
     timeSlots[date] = response.data;
     showToast("Slots generated successfully", "success");
   } catch (error) {
-    console.error("Ошибка генерации слотов:", error);
+    console.error("Error generating slots:", error);
     showToast("Error generating slots", "error");
   }
 };
@@ -188,7 +184,7 @@ const blockSlot = async (slotId) => {
     showToast("Slot blocked", "success");
     await loadWeekSlots();
   } catch (error) {
-    console.error("Ошибка блокировки слота:", error);
+    console.error("Error blocking slot:", error);
     showToast("Error blocking slot", "error");
   }
 };
@@ -199,7 +195,7 @@ const unblockSlot = async (slotId) => {
     showToast("Slot unblocked", "success");
     await loadWeekSlots();
   } catch (error) {
-    console.error("Ошибка разблокировки слота:", error);
+    console.error("Error unblocking slot:", error);
     showToast("Error unblocking slot", "error");
   }
 };
@@ -242,7 +238,7 @@ const cancelBooking = async (bookingId) => {
     showToast("Booking cancelled", "success");
     await loadWeekSlots();
   } catch (error) {
-    console.error("Ошибка отмены бронирования:", error);
+    console.error("Error cancelling booking", error);
     showToast("Error cancelling booking", "error");
   }
 };
@@ -302,7 +298,7 @@ onMounted(async () => {
       client.value = profileResponse.data;
       isAdmin.value = profileResponse.data.role === "ADMIN";
     } catch (error) {
-      console.error("Ошибка получения профиля:", error);
+      console.error("Error loading profile:", error);
     }
   }
   for (let hour = 8; hour < 18; hour++) {

@@ -98,7 +98,6 @@ const showNotification = ref(false);
 const notificationText = ref("");
 const notificationType = ref("");
 
-// Функция для показа уведомлений
 const showToast = (text, type) => {
   notificationText.value = text;
   notificationType.value = type;
@@ -120,7 +119,7 @@ const fetchUserProfile = async () => {
       isAuthenticated.value = true;
     }
   } catch (error) {
-    console.error("Ошибка загрузки профиля:", error);
+    console.error("Error loading profile:", error);
   }
 };
 
@@ -129,7 +128,7 @@ const loadProducts = async () => {
     const response = await axios.get("/api/products");
     products.value = response.data;
   } catch (error) {
-    console.error("Ошибка загрузки продуктов:", error);
+    console.error("Error loading products:", error);
   }
 };
 
@@ -145,7 +144,6 @@ const addOrEditProduct = async () => {
         headers: { Authorization: `Bearer ${token}` },
       });
     }
-    // Сброс полей формы
     newProduct.id = null;
     newProduct.name = "";
     newProduct.description = "";

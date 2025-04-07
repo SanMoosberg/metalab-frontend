@@ -102,7 +102,6 @@ export default {
     const successMessage = ref("");
     const router = useRouter();
 
-    // Получаем глобальное свойство updateAuthState, установленное в main.js
     const { appContext } = getCurrentInstance();
     const updateAuthState = appContext.config.globalProperties.updateAuthState;
 
