@@ -24,10 +24,7 @@
           :key="date"
           :class="[
             'date-column',
-            {
-              today: isToday(date),
-              'past-date': isPastDate(date),
-            },
+            { today: isToday(date), 'past-date': isPastDate(date) },
           ]"
         >
           <div class="date-header">
@@ -113,220 +110,205 @@
   </div>
 </template>
 
-<script>
+<script setup>
+import { ref, reactive, onMounted } from "vue";
+import { useRouter } from "vue-router";
 import axios from "axios";
 
-export default {
-  name: "BookingView",
+const weekDates = ref([]);
+const timeSlots = reactive({});
+const bookings = reactive({});
+const isAdmin = ref(false);
+const isAuthenticated = ref(false);
+const client = ref(null);
+const showNotification = ref(false);
+const notificationText = ref("");
+const notificationType = ref("");
+const timeIntervals = ref([]);
 
-  data() {
-    return {
-      currentWeek: "",
-      weekDates: [],
-      timeSlots: {},
-      bookings: {},
-      isAdmin: false,
-      isAuthenticated: false,
-      client: null,
-      showNotification: false,
-      notificationText: "",
-      notificationType: "",
-      timeIntervals: [],
-    };
-  },
+const router = useRouter();
 
-  async created() {
-    const token = localStorage.getItem("jwtToken");
-    if (token) {
-      this.isAuthenticated = true;
+const formatDate = (date) => date.toISOString().split("T")[0];
+
+const setCurrentWeek = (date) => {
+  const base = new Date(date);
+  const mondayOffset = base.getDate() - base.getDay() + 1;
+  weekDates.value = Array.from({ length: 7 }, (_, i) => {
+    const day = new Date(base);
+    day.setDate(mondayOffset + i);
+    return formatDate(day);
+  });
+  loadWeekSlots();
+};
+
+const loadWeekSlots = async () => {
+  // Очищаем текущие бронирования
+  for (const key in bookings) {
+    delete bookings[key];
+  }
+  for (const date of weekDates.value) {
+    try {
+      const response = await axios.get(`/api/slots`, { params: { date } });
+      const slots = response.data;
+      for (const slot of slots) {
+        if (slot.status === "BOOKED") {
+          try {
+            const bookingResponse = await axios.get(`/api/bookings/${slot.id}`);
+            bookings[slot.id] = bookingResponse.data;
+          } catch (error) {
+            console.error(
+              `Ошибка получения бронирования для слота ${slot.id}:`,
+              error
+            );
+          }
+        }
+      }
+      timeSlots[date] = slots;
+    } catch (error) {
+      console.error(`Ошибка получения слотов для даты ${date}:`, error);
+    }
+  }
+};
+
+const generateSlots = async (date) => {
+  try {
+    await axios.post(`/api/slots/generate`, null, { params: { date } });
+    const response = await axios.get(`/api/slots`, { params: { date } });
+    timeSlots[date] = response.data;
+    showToast("Slots generated successfully", "success");
+  } catch (error) {
+    console.error("Ошибка генерации слотов:", error);
+    showToast("Error generating slots", "error");
+  }
+};
+
+const blockSlot = async (slotId) => {
+  try {
+    await axios.post(`/api/slots/${slotId}/block`);
+    showToast("Slot blocked", "success");
+    await loadWeekSlots();
+  } catch (error) {
+    console.error("Ошибка блокировки слота:", error);
+    showToast("Error blocking slot", "error");
+  }
+};
+
+const unblockSlot = async (slotId) => {
+  try {
+    await axios.post(`/api/slots/${slotId}/unblock`);
+    showToast("Slot unblocked", "success");
+    await loadWeekSlots();
+  } catch (error) {
+    console.error("Ошибка разблокировки слота:", error);
+    showToast("Error unblocking slot", "error");
+  }
+};
+
+const bookSlot = async (slotId) => {
+  if (!isAuthenticated.value) {
+    router.push("/login");
+    return;
+  }
+  try {
+    const response = await axios.post(`/api/bookings/book`, null, {
+      params: {
+        slotId,
+        clientId: client.value.id,
+      },
+    });
+    bookings[slotId] = response.data;
+    showToast("Time booked successfully", "success");
+    await loadWeekSlots();
+  } catch (error) {
+    if (
+      error.response &&
+      (error.response.status === 409 || error.response.status === 400) &&
+      typeof error.response.data === "string" &&
+      error.response.data.includes("already has a booking")
+    ) {
+      showToast(
+        "You already have a booking. Please cancel your existing booking first.",
+        "error"
+      );
+      return;
+    }
+    showToast("Error during booking", "error");
+  }
+};
+
+const cancelBooking = async (bookingId) => {
+  try {
+    await axios.delete(`/api/bookings/${bookingId}`);
+    showToast("Booking cancelled", "success");
+    await loadWeekSlots();
+  } catch (error) {
+    console.error("Ошибка отмены бронирования:", error);
+    showToast("Error cancelling booking", "error");
+  }
+};
+
+const showToast = (text, type) => {
+  notificationText.value = text;
+  notificationType.value = type;
+  showNotification.value = true;
+  setTimeout(() => {
+    showNotification.value = false;
+  }, 3000);
+};
+
+const getSlotForTime = (time, date) => {
+  const slots = timeSlots[date] || [];
+  return slots.find((slot) => slot.startTime.slice(0, 5) === time);
+};
+
+const navigateWeek = (direction) => {
+  const firstDate = new Date(weekDates.value[0]);
+  firstDate.setDate(firstDate.getDate() + direction * 7);
+  setCurrentWeek(firstDate);
+};
+
+const formatDayDate = (dateStr) => {
+  const date = new Date(dateStr);
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  return `${days[date.getDay()]}, ${date.getDate()}`;
+};
+
+const isToday = (dateStr) => {
+  const today = formatDate(new Date());
+  return dateStr === today;
+};
+
+const isPastDate = (dateStr) => {
+  const today = formatDate(new Date());
+  return dateStr < today;
+};
+
+const canCancelBooking = (slot) => {
+  if (!slot || slot.status !== "BOOKED" || !client.value) {
+    return false;
+  }
+  const booking = bookings[slot.id];
+  return booking ? booking.clientId === client.value.id : false;
+};
+
+onMounted(async () => {
+  const token = localStorage.getItem("jwtToken");
+  if (token) {
+    isAuthenticated.value = true;
+    try {
       const profileResponse = await axios.get("/api/auth/profile", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      this.client = profileResponse.data;
-      this.isAdmin = profileResponse.data.role === "ADMIN";
+      client.value = profileResponse.data;
+      isAdmin.value = profileResponse.data.role === "ADMIN";
+    } catch (error) {
+      console.error("Ошибка получения профиля:", error);
     }
-    for (let hour = 8; hour < 18; hour++) {
-      this.timeIntervals.push(
-        `${hour.toString().padStart(2, "0")}:00`,
-        `${hour.toString().padStart(2, "0")}:30`
-      );
-    }
-
-    this.setCurrentWeek(new Date());
-  },
-
-  methods: {
-    setCurrentWeek(date) {
-      const curr = new Date(date);
-      const first = curr.getDate() - curr.getDay() + 1;
-      this.weekDates = Array(7)
-        .fill()
-        .map((_, i) => {
-          const day = new Date(curr.setDate(first + i));
-          return this.formatDate(day);
-        });
-
-      this.loadWeekSlots();
-    },
-
-    formatDate(date) {
-      return date.toISOString().split("T")[0];
-    },
-
-    canCancelBooking(slot) {
-      if (!slot || slot.status !== "BOOKED" || !this.client) {
-        return false;
-      }
-      const booking = this.bookings[slot.id];
-      if (!booking) {
-        return false;
-      }
-      return booking.clientId === this.client.id;
-    },
-
-    async loadWeekSlots() {
-      this.bookings = {};
-      for (const date of this.weekDates) {
-        try {
-          const response = await axios.get(`/api/slots`, { params: { date } });
-          const slots = response.data;
-          for (const slot of slots) {
-            if (slot.status === "BOOKED") {
-              try {
-                const bookingResponse = await axios.get(
-                  `/api/bookings/${slot.id}`
-                );
-                const booking = bookingResponse.data;
-                this.$set(this.bookings, slot.id, booking);
-              } catch (error) {
-                console.error(
-                  `Error getting booking for slot ${slot.id}:`,
-                  error
-                );
-              }
-            }
-          }
-          this.$set(this.timeSlots, date, slots);
-        } catch (error) {
-          console.error(`Error getting slots for date ${date}:`, error);
-        }
-      }
-    },
-
-    async generateSlots(date) {
-      try {
-        await axios.post(`/api/slots/generate`, null, { params: { date } });
-        const response = await axios.get(`/api/slots`, { params: { date } });
-        this.timeSlots[date] = response.data;
-        this.showToast("Slots generated successfully", "success");
-      } catch (error) {
-        console.error("Error generating slots:", error);
-        this.showToast("Error generating slots", "error");
-      }
-    },
-
-    async blockSlot(slotId) {
-      try {
-        await axios.post(`/api/slots/${slotId}/block`);
-        this.showToast("Slot blocked", "success");
-        await this.loadWeekSlots();
-      } catch (error) {
-        console.error("Error blocking slot:", error);
-        this.showToast("Error blocking slot", "error");
-      }
-    },
-
-    async unblockSlot(slotId) {
-      try {
-        await axios.post(`/api/slots/${slotId}/unblock`);
-        this.showToast("Slot unblocked", "success");
-        await this.loadWeekSlots();
-      } catch (error) {
-        console.error("Error unblocking slot:", error);
-        this.showToast("Error unblocking slot", "error");
-      }
-    },
-
-    async bookSlot(slotId) {
-      if (!this.isAuthenticated) {
-        this.$router.push("/login");
-        return;
-      }
-      try {
-        const response = await axios.post(`/api/bookings/book`, null, {
-          params: {
-            slotId: slotId,
-            clientId: this.client.id,
-          },
-        });
-        const booking = response.data;
-        this.$set(this.bookings, slotId, booking);
-        this.showToast("Time booked successfully", "success");
-        await this.loadWeekSlots();
-      } catch (error) {
-        if (error.response) {
-          if (
-            (error.response.status === 409 || error.response.status === 400) &&
-            typeof error.response.data === "string" &&
-            error.response.data.includes("already has a booking")
-          ) {
-            this.showToast(
-              "You already have a booking. Please cancel your existing booking first.",
-              "error"
-            );
-            return;
-          }
-        }
-        this.showToast("Error during booking", "error");
-      }
-    },
-
-    async cancelBooking(bookingId) {
-      try {
-        await axios.delete(`/api/bookings/${bookingId}`);
-        this.showToast("Booking cancelled", "success");
-        await this.loadWeekSlots();
-      } catch (error) {
-        console.error("Error cancelling booking:", error);
-        this.showToast("Error cancelling booking", "error");
-      }
-    },
-
-    showToast(text, type) {
-      this.notificationText = text;
-      this.notificationType = type;
-      this.showNotification = true;
-      setTimeout(() => {
-        this.showNotification = false;
-      }, 3000);
-    },
-
-    getSlotForTime(time, date) {
-      const slots = this.timeSlots[date] || [];
-      return slots.find((slot) => slot.startTime.slice(0, 5) === time);
-    },
-
-    navigateWeek(direction) {
-      const firstDate = new Date(this.weekDates[0]);
-      firstDate.setDate(firstDate.getDate() + direction * 7);
-      this.setCurrentWeek(firstDate);
-    },
-
-    formatDayDate(dateStr) {
-      const date = new Date(dateStr);
-      const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-      return `${days[date.getDay()]}, ${date.getDate()}`;
-    },
-
-    isToday(dateStr) {
-      const today = this.formatDate(new Date());
-      return dateStr === today;
-    },
-
-    isPastDate(dateStr) {
-      const today = this.formatDate(new Date());
-      return dateStr < today;
-    },
-  },
-};
+  }
+  for (let hour = 8; hour < 18; hour++) {
+    const formattedHour = hour.toString().padStart(2, "0");
+    timeIntervals.value.push(`${formattedHour}:00`, `${formattedHour}:30`);
+  }
+  setCurrentWeek(new Date());
+});
 </script>

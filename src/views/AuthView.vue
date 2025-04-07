@@ -86,92 +86,103 @@
 </template>
 
 <script>
+import { ref, getCurrentInstance } from "vue";
 import axios from "axios";
+import { useRouter } from "vue-router";
 
 export default {
   name: "AuthView",
-  data() {
-    return {
-      isLogin: true,
-      email: "",
-      username: "",
-      password: "",
-      confirmPassword: "",
-      errorMessage: "",
-      successMessage: "",
-    };
-  },
-  methods: {
-    async login() {
+  setup() {
+    const isLogin = ref(true);
+    const email = ref("");
+    const username = ref("");
+    const password = ref("");
+    const confirmPassword = ref("");
+    const errorMessage = ref("");
+    const successMessage = ref("");
+    const router = useRouter();
+
+    // Получаем глобальное свойство updateAuthState, установленное в main.js
+    const { appContext } = getCurrentInstance();
+    const updateAuthState = appContext.config.globalProperties.updateAuthState;
+
+    const login = async () => {
       try {
         const response = await axios.post("/api/auth/login", {
-          username: this.username,
-          password: this.password,
+          username: username.value,
+          password: password.value,
         });
-
         if (response.status === 200) {
           const token = response.data.token;
           localStorage.setItem("jwtToken", token);
           axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-          this.$root.updateAuthState();
-
-          this.$router.push("/profile");
+          updateAuthState();
+          router.push("/profile");
         }
       } catch (error) {
         if (error.response && error.response.status === 401) {
-          this.errorMessage = "Incorrect username or password";
+          errorMessage.value = "Incorrect username or password";
         } else {
-          this.errorMessage = "An error occurred while trying to log in.";
+          errorMessage.value = "An error occurred while trying to log in.";
         }
       }
-    },
+    };
 
-    async register() {
-      if (this.password !== this.confirmPassword) {
-        this.errorMessage = "Passwords do not match";
+    const register = async () => {
+      if (password.value !== confirmPassword.value) {
+        errorMessage.value = "Passwords do not match";
         return;
       }
-
       try {
-        const response = await axios.post("/api/auth/register", {
-          username: this.username,
-          password: this.password,
-          email: this.email,
+        await axios.post("/api/auth/register", {
+          username: username.value,
+          password: password.value,
+          email: email.value,
         });
-
-        if (response.status === 201 || response.status === 200) {
-          this.successMessage = "Registration successful! You can now log in.";
-          this.errorMessage = "";
-          setTimeout(() => {
-            this.isLogin = true;
-          }, 2000);
-        }
+        successMessage.value = "Registration successful! You can now log in.";
+        errorMessage.value = "";
+        setTimeout(() => {
+          isLogin.value = true;
+        }, 2000);
       } catch (error) {
         if (error.response && error.response.status === 409) {
           if (error.response.data && typeof error.response.data === "object") {
-            this.errorMessage = Object.values(error.response.data).join(". ");
+            errorMessage.value = Object.values(error.response.data).join(". ");
           } else {
-            this.errorMessage = "Username already exists";
+            errorMessage.value = "Username already exists";
           }
         } else if (error.response && error.response.status === 400) {
           if (error.response.data && typeof error.response.data === "object") {
-            this.errorMessage = Object.values(error.response.data).join(". ");
+            errorMessage.value = Object.values(error.response.data).join(". ");
           } else {
-            this.errorMessage = "Registration error. Please try again.";
+            errorMessage.value = "Registration error. Please try again.";
           }
         } else {
-          this.errorMessage =
+          errorMessage.value =
             "An error occurred while trying to register. Please try again.";
         }
-        this.successMessage = "";
+        successMessage.value = "";
       }
-    },
+    };
 
-    toggleForm() {
-      this.isLogin = !this.isLogin;
-      this.errorMessage = "";
-      this.successMessage = "";
-    },
+    const toggleForm = () => {
+      isLogin.value = !isLogin.value;
+      errorMessage.value = "";
+      successMessage.value = "";
+    };
+
+    return {
+      isLogin,
+      email,
+      username,
+      password,
+      confirmPassword,
+      errorMessage,
+      successMessage,
+      login,
+      register,
+      toggleForm,
+    };
   },
 };
 </script>

@@ -12,7 +12,7 @@
           </p>
         </div>
         <div class="image-block">
-          <img src="@/assets/images/his1.jpg" />
+          <img src="@/assets/images/his1.jpg" alt="Our History" />
         </div>
       </div>
     </section>
@@ -35,7 +35,7 @@
           </ul>
         </div>
         <div class="image-block">
-          <img src="@/assets/images/his2.jpg" />
+          <img src="@/assets/images/his2.jpg" alt="Our Mission" />
         </div>
       </div>
     </section>
@@ -63,9 +63,15 @@
           </ul>
         </div>
         <div class="image-block">
-          <img src="@/assets/images/his3.jpg" />
+          <img src="@/assets/images/his3.jpg" alt="Our Goals" />
         </div>
       </div>
     </section>
   </div>
 </template>
+
+<script>
+export default {
+  name: "HomeView",
+};
+</script>

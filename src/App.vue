@@ -13,7 +13,7 @@
           <li><router-link to="/booking">Booking</router-link></li>
           <li><router-link to="/contacts">Contact</router-link></li>
           <li>
-            <router-link v-if="!$root.isAuthenticated" to="/login"
+            <router-link v-if="!globalState.isAuthenticated" to="/login"
               >Login</router-link
             >
             <router-link v-else to="/profile">My Account</router-link>
@@ -69,7 +69,13 @@
 </template>
 
 <script>
+import { inject } from "vue";
+
 export default {
   name: "App",
+  setup() {
+    const globalState = inject("globalState");
+    return { globalState };
+  },
 };
 </script>

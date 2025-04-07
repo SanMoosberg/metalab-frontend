@@ -40,7 +40,6 @@
         >
           {{ isProductPurchased(product.id) ? "Purchased" : "" }}
         </div>
-
         <div class="analysis-content">
           <div class="analysis-info">
             <h2>{{ product.name }}</h2>
@@ -80,157 +79,160 @@
   </div>
 </template>
 
-<script>
+<script setup>
+import { ref, reactive, onMounted } from "vue";
 import axios from "axios";
 
-export default {
-  name: "CatalogView",
-  data() {
-    return {
-      client: null,
-      products: [],
-      isAdmin: false,
-      isAuthenticated: false,
-      isEditing: false,
-      newProduct: {
-        name: "",
-        description: "",
-        price: 0,
-      },
-      showNotification: false,
-      notificationText: "",
-      notificationType: "",
-    };
-  },
-  async created() {
-    const response = await axios.get("/api/products");
-    this.products = response.data;
+const client = ref(null);
+const products = ref([]);
+const isAdmin = ref(false);
+const isAuthenticated = ref(false);
+const isEditing = ref(false);
+const newProduct = reactive({
+  id: null,
+  name: "",
+  description: "",
+  price: 0,
+});
+const showNotification = ref(false);
+const notificationText = ref("");
+const notificationType = ref("");
 
+// Функция для показа уведомлений
+const showToast = (text, type) => {
+  notificationText.value = text;
+  notificationType.value = type;
+  showNotification.value = true;
+  setTimeout(() => {
+    showNotification.value = false;
+  }, 3000);
+};
+
+const fetchUserProfile = async () => {
+  try {
     const token = localStorage.getItem("jwtToken");
     if (token) {
-      this.isAuthenticated = true;
       const profileResponse = await axios.get("/api/auth/profile", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      this.client = profileResponse.data;
-      this.isAdmin = profileResponse.data.role === "ADMIN";
+      client.value = profileResponse.data;
+      isAdmin.value = profileResponse.data.role === "ADMIN";
+      isAuthenticated.value = true;
     }
-  },
-  methods: {
-    async addOrEditProduct() {
-      try {
-        const token = localStorage.getItem("jwtToken");
-        if (this.isEditing) {
-          await axios.patch(
-            `/api/products/${this.newProduct.id}`,
-            this.newProduct,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-            }
-          );
-        } else {
-          await axios.post("/api/products", this.newProduct, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-        }
-
-        this.newProduct = { id: null, name: "", description: "", price: 0 };
-        this.isEditing = false;
-
-        const response = await axios.get("/api/products");
-        this.products = response.data;
-      } catch (error) {
-        alert("Error: " + (error.response?.data?.message || error));
-      }
-    },
-
-    startEditing(product) {
-      this.newProduct = { ...product };
-      this.isEditing = true;
-    },
-    cancelEditing() {
-      this.newProduct = { id: null, name: "", description: "", price: 0 };
-      this.isEditing = false;
-    },
-
-    async deleteProduct(id) {
-      if (confirm("Are you sure you want to delete this test?")) {
-        try {
-          const token = localStorage.getItem("jwtToken");
-          await axios.delete(`/api/products/${id}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const response = await axios.get("/api/products");
-          this.products = response.data;
-        } catch (error) {
-          alert(
-            "Error deleting test: " + (error.response?.data?.message || error)
-          );
-        }
-      }
-    },
-
-    async fetchUserProfile() {
-      try {
-        const response = await axios.get("/api/auth/profile");
-        this.client = response.data;
-      } catch (error) {
-        console.error("Error loading profile:", error);
-      }
-    },
-
-    isProductPurchased(productId) {
-      return this.client?.productList?.some((p) => p.id === productId) || false;
-    },
-
-    async buyProduct(clientId, productId) {
-      if (this.isProductPurchased(productId)) {
-        this.showToast("This test is already purchased", "error");
-        return;
-      }
-      try {
-        const token = localStorage.getItem("jwtToken");
-        const response = await axios.post(
-          `/api/clients/${clientId}/${productId}`,
-          {},
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-
-        if (response.status >= 200 && response.status < 300) {
-          this.showToast("✓ Test added to cart", "success");
-        } else {
-          this.showToast("✗ Error adding test (unexpected status)", "error");
-        }
-
-        await this.fetchUserProfile();
-      } catch (error) {
-        console.error("Error adding test:", error);
-        this.showToast("✗ Error adding test", "error");
-      }
-    },
-
-    async removeOrder(clientId, productId) {
-      try {
-        const token = localStorage.getItem("jwtToken");
-        await axios.delete(`api/clients/${clientId}/${productId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        this.showToast("✓ Test removed from cart", "success");
-        await this.fetchUserProfile();
-      } catch (error) {
-        console.error("Error removing test:", error);
-        this.showToast("✗ Error removing test", "error");
-      }
-    },
-
-    showToast(text, type) {
-      this.notificationText = text;
-      this.notificationType = type;
-      this.showNotification = true;
-      setTimeout(() => {
-        this.showNotification = false;
-      }, 3000);
-    },
-  },
+  } catch (error) {
+    console.error("Ошибка загрузки профиля:", error);
+  }
 };
+
+const loadProducts = async () => {
+  try {
+    const response = await axios.get("/api/products");
+    products.value = response.data;
+  } catch (error) {
+    console.error("Ошибка загрузки продуктов:", error);
+  }
+};
+
+const addOrEditProduct = async () => {
+  try {
+    const token = localStorage.getItem("jwtToken");
+    if (isEditing.value) {
+      await axios.patch(`/api/products/${newProduct.id}`, newProduct, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } else {
+      await axios.post("/api/products", newProduct, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    }
+    // Сброс полей формы
+    newProduct.id = null;
+    newProduct.name = "";
+    newProduct.description = "";
+    newProduct.price = 0;
+    isEditing.value = false;
+    await loadProducts();
+  } catch (error) {
+    alert("Error: " + (error.response?.data?.message || error));
+  }
+};
+
+const startEditing = (product) => {
+  newProduct.id = product.id;
+  newProduct.name = product.name;
+  newProduct.description = product.description;
+  newProduct.price = product.price;
+  isEditing.value = true;
+};
+
+const cancelEditing = () => {
+  newProduct.id = null;
+  newProduct.name = "";
+  newProduct.description = "";
+  newProduct.price = 0;
+  isEditing.value = false;
+};
+
+const deleteProduct = async (id) => {
+  if (confirm("Are you sure you want to delete this test?")) {
+    try {
+      const token = localStorage.getItem("jwtToken");
+      await axios.delete(`/api/products/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await loadProducts();
+    } catch (error) {
+      alert("Error deleting test: " + (error.response?.data?.message || error));
+    }
+  }
+};
+
+const isProductPurchased = (productId) => {
+  return client.value?.productList?.some((p) => p.id === productId) || false;
+};
+
+const buyProduct = async (clientId, productId) => {
+  if (isProductPurchased(productId)) {
+    showToast("This test is already purchased", "error");
+    return;
+  }
+  try {
+    const token = localStorage.getItem("jwtToken");
+    const response = await axios.post(
+      `/api/clients/${clientId}/${productId}`,
+      {},
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    if (response.status >= 200 && response.status < 300) {
+      showToast("✓ Test added to cart", "success");
+    } else {
+      showToast("✗ Error adding test (unexpected status)", "error");
+    }
+    await fetchUserProfile();
+  } catch (error) {
+    console.error("Error adding test:", error);
+    showToast("✗ Error adding test", "error");
+  }
+};
+
+const removeOrder = async (clientId, productId) => {
+  try {
+    const token = localStorage.getItem("jwtToken");
+    await axios.delete(`/api/clients/${clientId}/${productId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    showToast("✓ Test removed from cart", "success");
+    await fetchUserProfile();
+  } catch (error) {
+    console.error("Error removing test:", error);
+    showToast("✗ Error removing test", "error");
+  }
+};
+
+onMounted(async () => {
+  await loadProducts();
+  await fetchUserProfile();
+});
 </script>

@@ -13,9 +13,9 @@
             wide range of analyses and diagnostic procedures with maximum
             accuracy of results.
           </p>
-          <router-link to="/about" class="primary-button"
-            >Learn More</router-link
-          >
+          <router-link to="/about" class="primary-button">
+            Learn More
+          </router-link>
         </div>
       </div>
     </section>
@@ -33,9 +33,9 @@
             modern techniques and expert-class equipment to ensure maximum
             accuracy of results.
           </p>
-          <router-link to="/catalog" class="primary-button"
-            >View Catalog</router-link
-          >
+          <router-link to="/catalog" class="primary-button">
+            View Catalog
+          </router-link>
         </div>
       </div>
     </section>
@@ -111,3 +111,5 @@
     </section>
   </div>
 </template>
+
+<script setup></script>

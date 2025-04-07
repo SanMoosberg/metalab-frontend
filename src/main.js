@@ -1,4 +1,4 @@
-import Vue from "vue";
+import { createApp, reactive } from "vue";
 import App from "./App.vue";
 import router from "./router";
 import axios from "axios";
@@ -26,19 +26,17 @@ axios.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-Vue.config.productionTip = false;
+const globalState = reactive({
+  isAuthenticated: !!localStorage.getItem("jwtToken"),
+});
 
-new Vue({
-  router,
-  data() {
-    return {
-      isAuthenticated: !!localStorage.getItem("jwtToken"),
-    };
-  },
-  methods: {
-    updateAuthState() {
-      this.isAuthenticated = !!localStorage.getItem("jwtToken");
-    },
-  },
-  render: (h) => h(App),
-}).$mount("#app");
+const app = createApp(App);
+
+app.provide("globalState", globalState);
+
+app.config.globalProperties.updateAuthState = () => {
+  globalState.isAuthenticated = !!localStorage.getItem("jwtToken");
+};
+
+app.use(router);
+app.mount("#app");

@@ -102,7 +102,7 @@
           class="purchases-total"
         >
           <span class="total-label">Total:</span>
-          <span class="total-amount"> {{ calculateTotal }} € </span>
+          <span class="total-amount">{{ calculateTotal }} €</span>
         </div>
 
         <div v-else class="empty-purchases">
@@ -117,109 +117,112 @@
   </div>
 </template>
 
-<script>
+<script setup>
+import { ref, computed, onMounted, getCurrentInstance } from "vue";
+import { useRouter } from "vue-router";
 import axios from "axios";
-export default {
-  name: "ProfileView",
-  data() {
-    return {
-      client: null,
-      booking: null,
-      showNotification: false,
-      notificationText: "",
-      notificationType: "",
-    };
-  },
-  computed: {
-    calculateTotal() {
-      if (
-        !this.client ||
-        !this.client.productList ||
-        !this.client.productList.length
-      )
-        return "0.00";
-      const total = this.client.productList.reduce(
-        (sum, product) => sum + (parseFloat(product.price) || 0),
-        0
-      );
-      return total.toFixed(2);
-    },
-    hasBooking() {
-      return this.booking !== null;
-    },
-  },
-  methods: {
-    async fetchUserProfile() {
-      try {
-        const response = await axios.get("/api/auth/profile");
-        this.client = response.data;
-        if (this.client && this.client.id) {
-          await this.fetchUserBooking(this.client.id);
-        }
-      } catch (error) {
-        console.error("Error loading profile:", error);
-      }
-    },
-    async fetchUserBooking(clientId) {
-      try {
-        const response = await axios.get(`/api/bookings/by-client/${clientId}`);
-        if (
-          response.data &&
-          typeof response.data === "object" &&
-          response.data.id
-        ) {
-          this.booking = response.data;
-        } else {
-          this.booking = null;
-        }
-      } catch (error) {
-        console.error("Error loading booking:", error);
-        this.booking = null;
-      }
-    },
-    async cancelBooking(bookingId) {
-      try {
-        await axios.delete(`/api/bookings/${bookingId}`);
-        this.showToast("Booking cancelled", "success");
-        this.booking = null;
-      } catch (error) {
-        console.error("Error cancelling booking:", error);
-        this.showToast("Error cancelling booking", "error");
-      }
-    },
-    logout() {
-      try {
-        localStorage.removeItem("jwtToken");
-        delete axios.defaults.headers.common["Authorization"];
-        if (this.$root && typeof this.$root.updateAuthState === "function") {
-          this.$root.updateAuthState();
-        }
-        this.$router.push("/login");
-      } catch (error) {
-        console.error("Error during logout:", error);
-        this.$router.push("/login");
-      }
-    },
-    showToast(text, type) {
-      this.notificationText = text;
-      this.notificationType = type;
-      this.showNotification = true;
-      setTimeout(() => {
-        this.showNotification = false;
-      }, 3000);
-    },
-    formatDate(dateStr) {
-      if (!dateStr) return "";
-      const date = new Date(dateStr);
-      return isNaN(date.getTime()) ? dateStr : date.toLocaleDateString("en-US");
-    },
-    formatTime(timeStr) {
-      if (!timeStr || typeof timeStr !== "string") return "";
-      return timeStr.substring(0, 5);
-    },
-  },
-  mounted() {
-    this.fetchUserProfile();
-  },
+
+const client = ref(null);
+const booking = ref(null);
+const showNotification = ref(false);
+const notificationText = ref("");
+const notificationType = ref("");
+
+const router = useRouter();
+
+const calculateTotal = computed(() => {
+  if (
+    !client.value ||
+    !client.value.productList ||
+    client.value.productList.length === 0
+  )
+    return "0.00";
+  const total = client.value.productList.reduce(
+    (sum, product) => sum + (parseFloat(product.price) || 0),
+    0
+  );
+  return total.toFixed(2);
+});
+
+const hasBooking = computed(() => booking.value !== null);
+
+const fetchUserProfile = async () => {
+  try {
+    const response = await axios.get("/api/auth/profile");
+    client.value = response.data;
+    if (client.value && client.value.id) {
+      await fetchUserBooking(client.value.id);
+    }
+  } catch (error) {
+    console.error("Error loading profile:", error);
+  }
 };
+
+const fetchUserBooking = async (clientId) => {
+  try {
+    const response = await axios.get(`/api/bookings/by-client/${clientId}`);
+    if (
+      response.data &&
+      typeof response.data === "object" &&
+      response.data.id
+    ) {
+      booking.value = response.data;
+    } else {
+      booking.value = null;
+    }
+  } catch (error) {
+    console.error("Error loading booking:", error);
+    booking.value = null;
+  }
+};
+
+const cancelBooking = async (bookingId) => {
+  try {
+    await axios.delete(`/api/bookings/${bookingId}`);
+    showToast("Booking cancelled", "success");
+    booking.value = null;
+  } catch (error) {
+    console.error("Error cancelling booking:", error);
+    showToast("Error cancelling booking", "error");
+  }
+};
+
+const logout = () => {
+  try {
+    localStorage.removeItem("jwtToken");
+    delete axios.defaults.headers.common["Authorization"];
+    const internalInstance = getCurrentInstance();
+    if (internalInstance?.appContext.config.globalProperties.updateAuthState) {
+      internalInstance.appContext.config.globalProperties.updateAuthState();
+    }
+    router.push("/login");
+  } catch (error) {
+    console.error("Error during logout:", error);
+    router.push("/login");
+  }
+};
+
+const showToast = (text, type) => {
+  notificationText.value = text;
+  notificationType.value = type;
+  showNotification.value = true;
+  setTimeout(() => {
+    showNotification.value = false;
+  }, 3000);
+};
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  return isNaN(date.getTime()) ? dateStr : date.toLocaleDateString("en-US");
+};
+
+const formatTime = (timeStr) => {
+  if (!timeStr || typeof timeStr !== "string") return "";
+  return timeStr.substring(0, 5);
+};
+
+onMounted(() => {
+  fetchUserProfile();
+});
 </script>
