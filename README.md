@@ -23,7 +23,7 @@
 
 ## CONFIGURATION
 
-Update the backend API endpoints (in axios calls) to match your server’s configuration. For example, check `/api/` paths in your components and services.
+Update the backend API endpoints (in axios calls) to match your server’s configuration.
 
 ## BUILD & RUN
 
